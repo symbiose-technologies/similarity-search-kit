@@ -235,7 +235,7 @@ extension SimilarityIndex {
                 let embedding = embeddings?[i]
                 let meta = metadata[i]
 
-                taskGroup.addTask(priority: .userInitiated) {
+                taskGroup.addTask(priority: .utility) {
                     // Add the item using the addItem method
                     await self.addItem(id: id, text: text, metadata: meta, embedding: embedding)
                     onProgress?(id)
