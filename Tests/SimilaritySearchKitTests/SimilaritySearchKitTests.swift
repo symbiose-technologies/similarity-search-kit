@@ -11,6 +11,7 @@ import CoreML
 @testable import SimilaritySearchKitDistilbert
 @testable import SimilaritySearchKitMiniLMAll
 @testable import SimilaritySearchKitMiniLMMultiQA
+@testable import SimilaritySearchKitGteSmall
 
 @available(macOS 13.0, iOS 16.0, *)
 class SimilaritySearchKitTests: XCTestCase {

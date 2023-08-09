@@ -278,7 +278,7 @@ struct Utils {
 
 extension MLMultiArray {
     /// All values will be stored in the last dimension of the MLMultiArray (default is dims=1)
-    static func from(_ arr: [Int], dims: Int = 1) -> MLMultiArray {
+    public static func from(_ arr: [Int], dims: Int = 1) -> MLMultiArray {
         var shape = Array(repeating: 1, count: dims)
         shape[shape.count - 1] = arr.count
         /// Examples:
@@ -341,4 +341,31 @@ extension MLMultiArray {
         }
         return arr
     }
+}
+
+
+
+public extension Array where Element == Float {
+    
+    @inlinable
+    func normalized() -> [Float]? {
+        // Compute the magnitude (length) of the vector.
+        let magnitude = sqrt(self.reduce(0, { $0 + $1*$1 }))
+        
+        // Check if magnitude is zero to prevent division by zero.
+        if magnitude == 0 {
+            return nil
+        }
+
+        // Normalize the vector by dividing each component by the magnitude.
+        let normalizedArray = self.map { $0 / magnitude }
+
+        return normalizedArray
+    }
+    
+    @inlinable
+    func magnitude() -> Float {
+        return sqrt(self.reduce(0, { $0 + $1*$1 }))
+    }
+    
 }

@@ -11,6 +11,8 @@ import CoreML
 @testable import SimilaritySearchKitDistilbert
 @testable import SimilaritySearchKitMiniLMAll
 @testable import SimilaritySearchKitMiniLMMultiQA
+@testable import SimilaritySearchKitGteSmall
+
 
 @available(macOS 13.0, iOS 16.0, *)
 class BenchmarkTests: XCTestCase {
@@ -153,10 +155,130 @@ class BenchmarkTests: XCTestCase {
 
         wait(for: [expectation], timeout: 60)
     }
+    
+    
+    
 
     func testNativePerformanceTokenization() {}
 
     func testNativePerformanceEmbeddings() {}
 
     func testNativePerformanceSearch() {}
+    
+    
+    //Mark: Gte-small
+    func test_gtesmall_ChecksumTest() {
+        let model = GteSmallEmbeddings()
+        let expectation = XCTestExpectation(description: "Encoding checksum test")
+        let passageTexts: [String] = [
+            "I am a test text"
+        ]
+        
+        Task {
+            let startTime = CFAbsoluteTimeGetCurrent()
+            await withTaskGroup(of: Void.self) { taskGroup in
+                for passageText in passageTexts {
+                    taskGroup.addTask {
+                        let vector = await model.encode(sentence: passageText)
+                        print("\(passageText) Result:\n \(vector ?? [])")
+                    }
+                }
+            }
+            let endTime = CFAbsoluteTimeGetCurrent()
+            let elapsedTime = endTime - startTime
+            let timePerPassageText = elapsedTime / Double(passageTexts.count) * 1000 // Convert to milliseconds
+            print("\nTime per passage text: \(timePerPassageText) ms each, \(elapsedTime) s total")
+            expectation.fulfill()
+        }
+
+        wait(for: [expectation], timeout: 60.0)
+    }
+    
+    func test_gtesmall_PerformanceEmbeddingsSync() {
+        let model = GteSmallEmbeddings()
+        let tokenizer = model.tokenizer
+        let passageTexts = MSMarco.passageTexts[0..<10]
+        var inputs = [(MLMultiArray, MLMultiArray)]()
+
+        // Do 10 Sync
+        for passageText in passageTexts {
+            let tokens = tokenizer.buildModelTokens(sentence: passageText)
+            let (input_id, attention_mask) = tokenizer.buildModelInputs(from: tokens)
+            inputs.append((input_id, attention_mask))
+        }
+
+        print("Generating embeddings for \(inputs.count) pre-tokenized inputs")
+        for input in inputs {
+            _ = model.generateGteSmallEmbeddings(inputIds: input.0, attentionMask: input.1)
+        }
+    }
+    
+    
+
+    func test_gtesmall_PerformanceEncodingAsync() {
+        let model = GteSmallEmbeddings()
+        let passageTexts = MSMarco.passageTexts[0..<10]
+
+        let expectation = XCTestExpectation(description: "Encoding passage texts")
+
+        Task {
+            print("\nEncoding \(passageTexts.count) passage texts ")
+            let startTime = CFAbsoluteTimeGetCurrent()
+            await withTaskGroup(of: Void.self) { taskGroup in
+                for passageText in passageTexts {
+                    taskGroup.addTask {
+                        _ = await model.encode(sentence: passageText)
+                    }
+                }
+            }
+            let endTime = CFAbsoluteTimeGetCurrent()
+            let elapsedTime = endTime - startTime
+            let timePerPassageText = elapsedTime / Double(passageTexts.count) * 1000 // Convert to milliseconds
+            print("\nTime per passage text: \(timePerPassageText) ms each, \(elapsedTime) s total")
+            expectation.fulfill()
+        }
+
+        wait(for: [expectation], timeout: 60.0)
+    }
+
+    func test_gtesmall_PerformanceSearch() {
+        let testAmount = 2
+        let passageIds = Array(0..<testAmount).map { _ in UUID().uuidString }
+        let passageTexts = Array(MSMarco.passageTexts[0..<testAmount])
+        let passageUrls = MSMarco.passageUrls[0..<testAmount].map { url in ["source": url] }
+
+        let expectation = XCTestExpectation(description: "Searching passage texts")
+
+        Task {
+            print("\nGenerating similarity index for \(testAmount) passages")
+            let similarityIndex = await SimilarityIndex(model: GteSmallEmbeddings())
+
+            var startTime = CFAbsoluteTimeGetCurrent()
+            await similarityIndex.addItems(
+                ids: passageIds,
+                texts: passageTexts,
+                metadata: passageUrls
+            )
+            var endTime = CFAbsoluteTimeGetCurrent()
+            var elapsedTime = endTime - startTime
+            print("\nGenerating index took \(elapsedTime) s")
+
+            print("\nSearching \(passageTexts.count) passage texts")
+            startTime = CFAbsoluteTimeGetCurrent()
+
+            let top_k = await similarityIndex.search("what is bitcoin?", top: 100)
+
+            XCTAssertNotNil(top_k)
+
+            endTime = CFAbsoluteTimeGetCurrent()
+            elapsedTime = endTime - startTime
+            let timePerPassageText = elapsedTime / Double(testAmount)
+            print("\nSeach time per passage text: \(timePerPassageText) s each, \(elapsedTime) s total\n")
+
+            expectation.fulfill()
+        }
+
+        wait(for: [expectation], timeout: 60)
+    }
+    
 }

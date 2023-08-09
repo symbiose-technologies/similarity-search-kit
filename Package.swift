@@ -26,6 +26,10 @@ let package = Package(
             name: "SimilaritySearchKitMiniLMMultiQA",
             targets: ["SimilaritySearchKitMiniLMMultiQA"]
         ),
+        .library(
+            name: "SimilaritySearchKitGteSmall",
+            targets: ["SimilaritySearchKitGteSmall"]
+        ),
     ],
     targets: [
         .target(
@@ -38,6 +42,11 @@ let package = Package(
             name: "SimilaritySearchKitDistilbert",
             dependencies: ["SimilaritySearchKit"],
             path: "Sources/SimilaritySearchKit/AddOns/Embeddings/Distilbert"
+        ),
+        .target(
+            name: "SimilaritySearchKitGteSmall",
+            dependencies: ["SimilaritySearchKit"],
+            path: "Sources/SimilaritySearchKit/AddOns/Embeddings/GteSmall"
         ),
         .target(
             name: "SimilaritySearchKitMiniLMAll",
@@ -53,6 +62,7 @@ let package = Package(
             name: "SimilaritySearchKitTests",
             dependencies: [
                 "SimilaritySearchKit",
+                "SimilaritySearchKitGteSmall",
                 "SimilaritySearchKitDistilbert",
                 "SimilaritySearchKitMiniLMAll",
                 "SimilaritySearchKitMiniLMMultiQA",
