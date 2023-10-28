@@ -18,20 +18,44 @@ import SimilaritySearchKit
 
 @available(macOS 13.0, iOS 16.0, *)
 public class GteSmallEmbeddings: EmbeddingsProtocol {
+
     public let model: thenlper_gte_small
+
+//    #if os(macOS)
+//    public let model: thenlper_gte_small
+//    #else
+//    public let model: thenlper_gte_small_quantized_8_bit
+//    #endif
     public let tokenizer: BertTokenizer
     public let inputDimention: Int = 512
     public let outputDimention: Int = 384
 
+    
     public init() {
         let modelConfig = MLModelConfiguration()
+       
         modelConfig.computeUnits = .all
-
         do {
             self.model = try thenlper_gte_small(configuration: modelConfig)
         } catch {
             fatalError("Failed to load the Core ML model. Error: \(error.localizedDescription)")
         }
+        
+//        #if os(macOS)
+//        modelConfig.computeUnits = .all
+//        do {
+//            self.model = try thenlper_gte_small(configuration: modelConfig)
+//        } catch {
+//            fatalError("Failed to load the Core ML model. Error: \(error.localizedDescription)")
+//        }
+//        #else
+//        modelConfig.computeUnits = .cpuAndGPU
+//        do {
+//            self.model = try thenlper_gte_small_quantized_8_bit(configuration: modelConfig)
+//        } catch {
+//            fatalError("Failed to load the Core ML model. Error: \(error.localizedDescription)")
+//        }
+//        #endif
 
         self.tokenizer = BertTokenizer()
     }
@@ -66,12 +90,24 @@ public class GteSmallEmbeddings: EmbeddingsProtocol {
         
         let tokenTypeIds = MLMultiArray.from(tokenTypeIdValues, dims: 2)
         
-        
         let inputFeatures = thenlper_gte_smallInput(
             input_ids: inputIds,
             token_type_ids: tokenTypeIds,
             attention_mask: attentionMask
         )
+//#if os(macOS)
+//        let inputFeatures = thenlper_gte_smallInput(
+//            input_ids: inputIds,
+//            token_type_ids: tokenTypeIds,
+//            attention_mask: attentionMask
+//        )
+//#else
+//        let inputFeatures = thenlper_gte_small_quantized_8_bitInput(
+//            input_ids: inputIds,
+//            token_type_ids: tokenTypeIds,
+//            attention_mask: attentionMask
+//        )
+//#endif
 
         let output = try? model.prediction(input: inputFeatures)
 

@@ -17,11 +17,21 @@ public typealias TextSplitterType = SimilarityIndex.TextSplitterType
 public typealias VectorStoreType = SimilarityIndex.VectorStoreType
 
 @available(macOS 11.0, iOS 15.0, *)
-public class SimilarityIndex {
+open class SimilarityIndex {
     // MARK: - Properties
 
     /// The items stored in the index.
     public var indexItems: [IndexItem] = []
+    
+    ///If store is a JIT provider
+    public var resolvedIndexItems: [IndexItem] {
+        if !self.vectorStore.isJitProvider {
+            return self.indexItems
+        } else {
+            return self.vectorStore.jitItems
+        }
+    }
+    
 
     /// The dimension of the embeddings in the index.
     /// Used to validate emebdding updates
@@ -47,6 +57,7 @@ public class SimilarityIndex {
 
         /// A dictionary containing metadata for the item.
         public var metadata: [String: String]
+        
     }
 
     /// An Identifiable object containing information about a search result.
@@ -100,6 +111,21 @@ public class SimilarityIndex {
     }
 
     // MARK: - Initializers
+    public init(name: String? = nil,
+                dimensionSize: Int,
+                model: (any EmbeddingsProtocol),
+                metric: (any DistanceMetricProtocol)? = nil,
+                vectorStore: (any VectorStoreProtocol)? = nil
+    ) {
+        // Setup index with defaults
+        self.indexName = name ?? "SimilaritySearchKitIndex"
+        self.indexModel = model ?? NativeEmbeddings()
+        self.indexMetric = metric ?? CosineSimilarity()
+        self.vectorStore = vectorStore ?? JsonStore()
+        self.dimension = dimensionSize
+    }
+    
+    
 
     public init(name: String? = nil, model: (any EmbeddingsProtocol)? = nil, metric: (any DistanceMetricProtocol)? = nil, vectorStore: (any VectorStoreProtocol)? = nil) async {
         // Setup index with defaults
@@ -148,7 +174,7 @@ public class SimilarityIndex {
         var indexIds: [String] = []
         var indexEmbeddings: [[Float]] = []
 
-        indexItems.forEach { item in
+        resolvedIndexItems.forEach { item in
             indexIds.append(item.id)
             indexEmbeddings.append(item.embedding)
         }
@@ -215,7 +241,14 @@ extension SimilarityIndex {
         let embeddingResult = await getEmbedding(for: text, embedding: embedding)
 
         let item = IndexItem(id: id, text: text, embedding: embeddingResult, metadata: metadata)
-        indexItems.append(item)
+        
+        if !self.vectorStore.isJitProvider {
+            indexItems.append(item)
+        } else {
+            self.vectorStore.acceptAddedItem(item: item)
+        }
+        
+        
     }
 
     public func addItems(ids: [String], texts: [String], metadata: [[String: String]], embeddings: [[Float]?]? = nil, onProgress: ((String) -> Void)? = nil) async {
@@ -256,11 +289,11 @@ extension SimilarityIndex {
     // MARK: Read
 
     public func getItem(id: String) -> IndexItem? {
-        return indexItems.first { $0.id == id }
+        return resolvedIndexItems.first { $0.id == id }
     }
 
     public func sample(_ count: Int) -> [IndexItem]? {
-        return Array(indexItems.prefix(upTo: count))
+        return Array(resolvedIndexItems.prefix(upTo: count))
     }
 
     // MARK: Update
@@ -287,6 +320,7 @@ extension SimilarityIndex {
             if let metadata = metadata {
                 indexItems[index].metadata = metadata
             }
+            
         }
     }
 
