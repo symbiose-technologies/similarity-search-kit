@@ -17,7 +17,7 @@ public typealias TextSplitterType = SimilarityIndex.TextSplitterType
 public typealias VectorStoreType = SimilarityIndex.VectorStoreType
 
 @available(macOS 11.0, iOS 15.0, *)
-public class SimilarityIndex: Identifiable, Hashable {
+open class SimilarityIndex: Identifiable, Hashable {
     // MARK: - Properties
 
     /// Unique identifier for this index instance
@@ -32,6 +32,16 @@ public class SimilarityIndex: Identifiable, Hashable {
 
     /// The items stored in the index.
     public var indexItems: [IndexItem] = []
+    
+    ///If store is a JIT provider
+    public var resolvedIndexItems: [IndexItem] {
+        if !self.vectorStore.isJitProvider {
+            return self.indexItems
+        } else {
+            return self.vectorStore.jitItems
+        }
+    }
+    
 
     /// The dimension of the embeddings in the index.
     /// Used to validate emebdding updates
@@ -57,6 +67,7 @@ public class SimilarityIndex: Identifiable, Hashable {
 
         /// A dictionary containing metadata for the item.
         public var metadata: [String: String]
+        
     }
 
     /// An Identifiable object containing information about a search result.
@@ -110,6 +121,21 @@ public class SimilarityIndex: Identifiable, Hashable {
     }
 
     // MARK: - Initializers
+    public init(name: String? = nil,
+                dimensionSize: Int,
+                model: (any EmbeddingsProtocol),
+                metric: (any DistanceMetricProtocol)? = nil,
+                vectorStore: (any VectorStoreProtocol)? = nil
+    ) {
+        // Setup index with defaults
+        self.indexName = name ?? "SimilaritySearchKitIndex"
+        self.indexModel = model ?? NativeEmbeddings()
+        self.indexMetric = metric ?? CosineSimilarity()
+        self.vectorStore = vectorStore ?? JsonStore()
+        self.dimension = dimensionSize
+    }
+    
+    
 
     public init(name: String? = nil, model: (any EmbeddingsProtocol)? = nil, metric: (any DistanceMetricProtocol)? = nil, vectorStore: (any VectorStoreProtocol)? = nil) async {
         // Setup index with defaults
@@ -158,7 +184,7 @@ public class SimilarityIndex: Identifiable, Hashable {
         var indexIds: [String] = []
         var indexEmbeddings: [[Float]] = []
 
-        for item in indexItems {
+        for item in resolvedIndexItems {
             indexIds.append(item.id)
             indexEmbeddings.append(item.embedding)
         }
@@ -225,7 +251,14 @@ public extension SimilarityIndex {
         let embeddingResult = await getEmbedding(for: text, embedding: embedding)
 
         let item = IndexItem(id: id, text: text, embedding: embeddingResult, metadata: metadata)
-        indexItems.append(item)
+        
+        if !self.vectorStore.isJitProvider {
+            indexItems.append(item)
+        } else {
+            self.vectorStore.acceptAddedItem(item: item)
+        }
+        
+        
     }
 
     func addItems(ids: [String], texts: [String], metadata: [[String: String]], embeddings: [[Float]?]? = nil, onProgress: ((String) -> Void)? = nil) async {
@@ -245,7 +278,7 @@ public extension SimilarityIndex {
                 let embedding = embeddings?[i]
                 let meta = metadata[i]
 
-                taskGroup.addTask(priority: .userInitiated) {
+                taskGroup.addTask(priority: .utility) {
                     // Add the item using the addItem method
                     await self.addItem(id: id, text: text, metadata: meta, embedding: embedding)
                     onProgress?(id)
@@ -266,9 +299,10 @@ public extension SimilarityIndex {
 
     // MARK: Read
 
-    func getItem(id: String) -> IndexItem? {
-        return indexItems.first { $0.id == id }
+    public func getItem(id: String) -> IndexItem? {
+        return resolvedIndexItems.first { $0.id == id }
     }
+
 
     func sample(_ count: Int) -> [IndexItem]? {
         return Array(indexItems.prefix(upTo: count))
@@ -298,6 +332,7 @@ public extension SimilarityIndex {
             if let metadata = metadata {
                 indexItems[index].metadata = metadata
             }
+            
         }
     }
 
