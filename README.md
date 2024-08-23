@@ -110,7 +110,7 @@ A small but growing list of pre-converted models can be found in this repo on [H
 | Metric | Description |
 | --- | --- |
 | `DotProduct` | Measures the similarity between two vectors as the product of their magnitudes |
-| `CostineSimilarity` | Calculates similarity by measuring the cosine of the angle between two vectors |
+| `CosineSimilarity` | Calculates similarity by measuring the cosine of the angle between two vectors |
 | `EuclideanDistance` | Computes the straight-line distance between two points in Euclidean space |
 
 Metrics conform to the `DistanceMetricProtocol` and can be used interchangeably with the `SimilarityIndex` class.
@@ -119,7 +119,7 @@ Metrics conform to the `DistanceMetricProtocol` and can be used interchangeably 
 
 All the main parts of the `SimilarityIndex` can be overriden with custom implementations that conform to the following protocols:
 
-### EmbeddingProtocol
+### EmbeddingsProtocol
 
 Accepts a string and returns an array of floats representing the embedding of the input text.
 
@@ -185,7 +185,7 @@ This project has been inspired by the incredible advancements in natural languag
 Here's a short list of some features that are planned for future releases:
 
 - [x] In-memory indexing
-- [ ] Disk-backed indexing
+- [x] Disk-backed indexing
   - For large datasets that don't fit in memory
 - [ ] All around performance improvements
 - [ ] Swift-DocC website

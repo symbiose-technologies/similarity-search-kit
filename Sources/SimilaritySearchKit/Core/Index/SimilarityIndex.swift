@@ -17,8 +17,18 @@ public typealias TextSplitterType = SimilarityIndex.TextSplitterType
 public typealias VectorStoreType = SimilarityIndex.VectorStoreType
 
 @available(macOS 11.0, iOS 15.0, *)
-open class SimilarityIndex {
+open class SimilarityIndex: Identifiable, Hashable {
     // MARK: - Properties
+
+    /// Unique identifier for this index instance
+    public var id: UUID = .init()
+    public static func == (lhs: SimilarityIndex, rhs: SimilarityIndex) -> Bool {
+        return lhs.id == rhs.id
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
+    }
 
     /// The items stored in the index.
     public var indexItems: [IndexItem] = []
@@ -174,7 +184,7 @@ open class SimilarityIndex {
         var indexIds: [String] = []
         var indexEmbeddings: [[Float]] = []
 
-        resolvedIndexItems.forEach { item in
+        for item in resolvedIndexItems {
             indexIds.append(item.id)
             indexEmbeddings.append(item.embedding)
         }
@@ -233,11 +243,11 @@ open class SimilarityIndex {
 // MARK: - CRUD
 
 @available(macOS 11.0, iOS 15.0, *)
-extension SimilarityIndex {
+public extension SimilarityIndex {
     // MARK: Create
 
-    // Add an item with optional pre-computed embedding
-    public func addItem(id: String, text: String, metadata: [String: String], embedding: [Float]? = nil) async {
+    /// Add an item with optional pre-computed embedding
+    func addItem(id: String, text: String, metadata: [String: String], embedding: [Float]? = nil) async {
         let embeddingResult = await getEmbedding(for: text, embedding: embedding)
 
         let item = IndexItem(id: id, text: text, embedding: embeddingResult, metadata: metadata)
@@ -251,7 +261,7 @@ extension SimilarityIndex {
         
     }
 
-    public func addItems(ids: [String], texts: [String], metadata: [[String: String]], embeddings: [[Float]?]? = nil, onProgress: ((String) -> Void)? = nil) async {
+    func addItems(ids: [String], texts: [String], metadata: [[String: String]], embeddings: [[Float]?]? = nil, onProgress: ((String) -> Void)? = nil) async {
         // Check if all input arrays have the same length
         guard ids.count == texts.count, texts.count == metadata.count else {
             fatalError("Input arrays must have the same length.")
@@ -278,11 +288,12 @@ extension SimilarityIndex {
         }
     }
 
-    public func addItems(_ items: [IndexItem]) {
+    func addItems(_ items: [IndexItem], completion: (() -> Void)? = nil) {
         Task {
             for item in items {
                 await self.addItem(id: item.id, text: item.text, metadata: item.metadata, embedding: item.embedding)
             }
+            completion?()
         }
     }
 
@@ -292,13 +303,14 @@ extension SimilarityIndex {
         return resolvedIndexItems.first { $0.id == id }
     }
 
-    public func sample(_ count: Int) -> [IndexItem]? {
-        return Array(resolvedIndexItems.prefix(upTo: count))
+
+    func sample(_ count: Int) -> [IndexItem]? {
+        return Array(indexItems.prefix(upTo: count))
     }
 
     // MARK: Update
 
-    public func updateItem(id: String, text: String? = nil, embedding: [Float]? = nil, metadata: [String: String]? = nil) {
+    func updateItem(id: String, text: String? = nil, embedding: [Float]? = nil, metadata: [String: String]? = nil) {
         // Check if the provided embedding has the correct dimension
         if let embedding = embedding, embedding.count != dimension {
             print("Dimension mismatch, expected \(dimension), saw \(embedding.count)")
@@ -326,11 +338,11 @@ extension SimilarityIndex {
 
     // MARK: Delete
 
-    public func removeItem(id: String) {
+    func removeItem(id: String) {
         indexItems.removeAll { $0.id == id }
     }
 
-    public func removeAll() {
+    func removeAll() {
         indexItems.removeAll()
     }
 }
@@ -338,8 +350,8 @@ extension SimilarityIndex {
 // MARK: - Persistence
 
 @available(macOS 13.0, iOS 16.0, *)
-extension SimilarityIndex {
-    public func saveIndex(toDirectory path: URL? = nil, name: String? = nil) throws -> URL {
+public extension SimilarityIndex {
+    func saveIndex(toDirectory path: URL? = nil, name: String? = nil) throws -> URL {
         let indexName = name ?? self.indexName
         let basePath: URL
 
@@ -357,7 +369,23 @@ extension SimilarityIndex {
         return savedVectorStore
     }
 
-    public func loadIndex(fromDirectory path: URL? = nil, name: String? = nil) throws -> [IndexItem]? {
+    func loadIndex(fromDirectory path: URL? = nil, name: String? = nil) throws -> [IndexItem]? {
+        if let indexPath = try getIndexPath(fromDirectory: path, name: name) {
+            indexItems = try vectorStore.loadIndex(from: indexPath)
+            return indexItems
+        }
+
+        return nil
+    }
+
+    /// This function returns the default location where the data from the loadIndex/saveIndex functions gets stored
+    /// gets stored.
+    /// - Parameters:
+    ///   - fromDirectory: optional directory path where the file postfix is added to
+    ///   - name: optional name
+    ///
+    /// - Returns: an optional URL
+    func getIndexPath(fromDirectory path: URL? = nil, name: String? = nil) throws -> URL? {
         let indexName = name ?? self.indexName
         let basePath: URL
 
@@ -367,15 +395,7 @@ extension SimilarityIndex {
             // Default local path
             basePath = try getDefaultStoragePath()
         }
-
-        if let vectorStorePath = vectorStore.listIndexes(at: basePath).first(where: { $0.lastPathComponent.contains(indexName) }) {
-            let loadedIndexItems = try vectorStore.loadIndex(from: vectorStorePath)
-            addItems(loadedIndexItems)
-            print("Loaded \(indexItems.count) index items from \(vectorStorePath.absoluteString)")
-            return loadedIndexItems
-        }
-
-        return nil
+        return vectorStore.listIndexes(at: basePath).first(where: { $0.lastPathComponent.contains(indexName) })
     }
 
     private func getDefaultStoragePath() throws -> URL {
@@ -392,7 +412,7 @@ extension SimilarityIndex {
         return appSpecificDirectory
     }
 
-    public func estimatedSizeInBytes() -> Int {
+    func estimatedSizeInBytes() -> Int {
         var totalSize = 0
 
         for item in indexItems {
@@ -407,7 +427,7 @@ extension SimilarityIndex {
             let embeddingSize = item.embedding.count * floatSize
 
             // Calculate the size of 'metadata' property
-            let metadataSize = item.metadata.reduce(0) { (size, keyValue) -> Int in
+            let metadataSize = item.metadata.reduce(0) { size, keyValue -> Int in
                 let keySize = keyValue.key.utf8.count
                 let valueSize = keyValue.value.utf8.count
                 return size + keySize + valueSize
