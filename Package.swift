@@ -46,7 +46,10 @@ let package = Package(
         .target(
             name: "SimilaritySearchKitGteSmall",
             dependencies: ["SimilaritySearchKit"],
-            path: "Sources/SimilaritySearchKit/AddOns/Embeddings/GteSmall"
+            path: "Sources/SimilaritySearchKit/AddOns/Embeddings/GteSmall",
+            resources: [
+                .process("thenlper-gte-small.mlpackage")
+            ]
         ),
         .target(
             name: "SimilaritySearchKitMiniLMAll",
