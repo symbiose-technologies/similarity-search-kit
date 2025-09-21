@@ -1,3 +1,12 @@
+## Symbiose Update 9.20.2025
+- pre-compile our usage of the `gte-small` `.mlmodel` into the `.mlmodelc` and corresponding swift interface so that the package can be built as part of a `swift build` process outside the scope of `xcodebuild`
+- BUT this does not work then when running in the xcodebuild process.
+This means there is NO way to get the `.mlpackage` to be properly built in both the `swift` and `xcodebuild` processes!
+We will simply choose to not further get this to build in the `swift build` process anymore.
+- Our failed attempt to get this (ie gte-small ml model) to both compile in both systems is in the `/model_backups` dir. 
+
+
+
 # SimilaritySearchKit
 [![](https://img.shields.io/github/actions/workflow/status/ZachNagengast/similarity-search-kit/swift.yml?branch=main)](https://github.com/ZachNagengast/similarity-search-kit/actions/workflows/swift.yml)
 [![](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2FZachNagengast%2Fsimilarity-search-kit%2Fbadge%3Ftype%3Dplatforms)](https://swiftpackageindex.com/ZachNagengast/similarity-search-kit)
